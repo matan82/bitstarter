@@ -26,6 +26,11 @@ var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "http://nameless-inlet-9927.herokuapp.com/";
+var sys=require('util');
+var rest=require('restler');
+var request = require('request');
+
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -60,15 +65,68 @@ var clone = function(fn) {
     // http://stackoverflow.com/a/6772648
     return fn.bind({});
 };
+ 
+var cheerioHtmlUrl = function(url,checksfile){
+	 request(url, function (error, response, body) {
+                if (!error && response.statusCode == 200) {
+                var $=cheerio.load(body);                
+		//var parsedhtml = $.html();
+		  var checks = loadChecks(checksfile).sort();
+		    var out = {};
+    			for(var ii in checks) {
+        		var present = $(checks[ii]).length > 0;
+        		out[checks[ii]] = present;
+			console.log(present);
+    			}
+    		return out;
+
+                //console.log(parsedhtml); // Print the google web page.
+                }
+        });
+
+};
+
+var checkURL = function(url,checksfile) {
+  rest.get(url).on('complete', function(result) {
+  if (result instanceof Error) {
+    sys.puts('Error: ' + result.message);
+  } else {
+        var $=cheerio.load(result);
+	var checks = loadChecks(checksfile).sort();
+        var out = {};
+                        for(var ii in checks) {
+                        var present = $(checks[ii]).length > 0;
+                        out[checks[ii]] = present;
+			}
+ 
+   var outJson = JSON.stringify(out, null, 4);
+   console.log(outJson);
+
+   return out;
+  }
+});
+
+};
+
+
+
 
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .parse(process.argv);
+	.option('-f, --file <html-file>','Path to index.html')
+	.option('-u, --url <url>')
+	.parse(process.argv);
+    if(program.file){ 
     var checkJson = checkHtmlFile(program.file, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
+
+    }
+    else {
+	var checkJson=checkURL(program.url, program.checks);
+    }
+   
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
